@@ -2,30 +2,68 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#ffe9f3">
 <title>AgVisualizer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🌸%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header>
-  <h1>AgVisualizer</h1>
+  <button id="menuBtn" class="icon" aria-label="Menu">☰</button>
+  <div class="brand"><span class="logo">🌸</span><b>AgVisualizer</b></div>
+  <button id="needsBtn" class="chip needs" aria-label="Needs me"><span class="em">🙋</span><span class="lbl">needs me</span><b id="needsCount">0</b></button>
+  <button id="timeBtn" class="chip time" aria-label="Office time"><span class="lbl">OFFICE TIME</span><span id="timeIcon">☀️</span><span id="clock"></span></button>
   <span id="mode" class="badge">connecting…</span>
 </header>
+
 <main>
-  <section class="stage">
-    <canvas id="office" width="960" height="600" aria-label="Office floor with agent characters"></canvas>
-    <form id="taskForm">
-      <input id="taskInput" type="text" maxlength="140" placeholder="Give the team a task, e.g. “Add dark mode to the settings page”" autocomplete="off" required>
-      <button type="submit">Dispatch</button>
-    </form>
+  <canvas id="floor" aria-label="Isometric office floor with agent characters"></canvas>
+  <button id="legendPill" class="pill">WHAT YOU'RE SEEING</button>
+
+  <section id="activity" class="card">
+    <div class="ahead">
+      <b>FLOOR ACTIVITY</b>
+      <button id="collapse" class="icon sm" aria-label="Collapse">▾</button>
+    </div>
+    <div class="abody">
+      <nav id="tabs" class="tabs">
+        <button data-f="all" class="on">ALL</button>
+        <button data-f="ready">📦 READY</button>
+        <button data-f="decision">❓ DECISIONS</button>
+        <button data-f="dark">🥀 DARK</button>
+        <button data-f="funny">🌷 FUNNY</button>
+      </nav>
+      <ol id="feed" class="feed"></ol>
+      <form id="taskForm">
+        <input id="taskInput" type="text" maxlength="140" placeholder="Give the team a task…" autocomplete="off">
+        <button type="submit">Dispatch</button>
+      </form>
+    </div>
   </section>
-  <aside>
-    <h2>Team</h2>
-    <ul id="agents" class="agents"></ul>
-    <h2 id="detailTitle">Activity</h2>
-    <ol id="feed" class="feed"></ol>
-  </aside>
+
+  <aside id="inspect" class="card" hidden></aside>
 </main>
+
+<div id="inboxModal" class="modal" hidden><div class="sheet card">
+  <div class="shead"><b>🙋 Needs me</b><button class="icon sm" data-close>✕</button></div>
+  <ol id="inboxList" class="inbox"></ol>
+</div></div>
+
+<div id="walkinModal" class="modal" hidden><div class="sheet card event">
+  <div class="tag">✨ OFFICE EVENT</div>
+  <div class="evrow"><canvas id="walkinFace" width="150" height="150"></canvas>
+    <div><h2 id="walkinName"></h2><p id="walkinText"></p></div></div>
+  <div class="btns"><button id="walkinYes" class="yes"><kbd>Y</kbd> Yes, let them stay</button><button id="walkinNo" class="no"><kbd>N</kbd> No, send them away</button></div>
+</div></div>
+
+<div id="legendModal" class="modal" hidden><div class="sheet card">
+  <div class="shead"><b>What you're seeing</b><button class="icon sm" data-close>✕</button></div>
+  <ul class="legend" id="legendList"></ul>
+  <p class="fine" id="modeNote"></p>
+</div></div>
+
+<div id="toast" hidden></div>
 <script type="module" src="app.js"></script>
 </body>
 </html>

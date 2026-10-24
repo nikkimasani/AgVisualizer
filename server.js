@@ -4,6 +4,8 @@
 //   GET  /api/stream   Server-Sent Events (snapshot, then every event)
 //   POST /api/events   push an event from any agent/hook  (see src/state.js)
 //   POST /api/hooks    Claude Code hook payload (see hooks/agvis-hook.js)
+//   POST /api/actions  {agent, action: answer|collect|nudge|unblock, choice}  (demo mode only)
+//   POST /api/walkins  {id, accepted}
 //   POST /api/tasks    {"title": "..."} run a task through the team
 
 import http from 'node:http';
@@ -11,15 +13,17 @@ import { readFile } from 'node:fs/promises';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { Office } from './src/state.js';
-import { simulateTask } from './src/simulator.js';
+import { Office } from './public/shared/state.js';
+import { simulateTask, startDemo } from './public/shared/demo.js';
 import { runTask } from './src/runner.js';
-import { handleHook } from './src/hooks.js';
+import { handleHook, startDarkSweeper } from './src/hooks.js';
 
 const ROOT = fileURLToPath(new URL('./public/', import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '127.0.0.1'; // endpoints are unauthenticated: stay on loopback by default
 const HOOKS = process.env.OFFICE_MODE === 'hooks';
+// Hosted UIs (Cloudflare Pages, Vercel) can read this server's stream if their origin is listed here.
+const ALLOW = (process.env.ALLOW_ORIGIN || '').split(',').map((o) => o.trim()).filter(Boolean);
 const SPEED = Number(process.env.SIM_SPEED) || 1;
 const REAL = Boolean(process.env.ANTHROPIC_API_KEY) && process.env.MODE !== 'sim';
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json' };
@@ -56,6 +60,15 @@ async function serveStatic(req, res) {
 }
 
 export const server = http.createServer(async (req, res) => {
+  const origin = req.headers.origin;
+  const sameOrigin = !origin || new URL(origin).host === req.headers.host;
+  if (origin && ALLOW.includes(origin)) {
+    res.setHeader('access-control-allow-origin', origin);
+    res.setHeader('vary', 'origin');
+    res.setHeader('access-control-allow-headers', 'content-type');
+    res.setHeader('access-control-allow-private-network', 'true');
+  }
+  if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
   try {
     if (req.method === 'GET' && req.url === '/api/state') return json(res, 200, office.snapshot());
 
@@ -70,7 +83,7 @@ export const server = http.createServer(async (req, res) => {
     }
 
     // Block cross-site POSTs from web pages; curl, hooks and our own page send no foreign Origin.
-    if (req.method === 'POST' && req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) {
+    if (req.method === 'POST' && !sameOrigin && !ALLOW.includes(origin)) {
       return json(res, 403, { error: 'cross-origin request refused' });
     }
 
@@ -82,6 +95,16 @@ export const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && req.url === '/api/events') {
       try { return json(res, 200, office.emit(await readBody(req))); }
       catch (err) { return json(res, 400, { error: err.message }); }
+    }
+
+    if (req.method === 'POST' && (req.url === '/api/actions' || req.url === '/api/walkins')) {
+      if (HOOKS || REAL) return json(res, 409, { error: 'view-only: answer this in your terminal / the real agent' });
+      try {
+        const body = await readBody(req);
+        if (req.url === '/api/walkins') office.resolveWalkin(String(body.id), Boolean(body.accepted));
+        else office.act(String(body.agent), String(body.action), body.choice);
+        return json(res, 200, { ok: true });
+      } catch (err) { return json(res, 400, { error: err.message }); }
     }
 
     if (req.method === 'POST' && req.url === '/api/tasks') {
@@ -101,5 +124,7 @@ export const server = http.createServer(async (req, res) => {
 });
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  if (HOOKS) startDarkSweeper(office, Number(process.env.DARK_AFTER_SECONDS || 120) * 1000);
+  else if (!REAL) startDemo(office, { speed: SPEED });
   server.listen(PORT, HOST, () => console.log(`AgVisualizer → http://localhost:${PORT}  (${HOOKS ? 'watching Claude Code hooks' : REAL ? 'live Claude agents' : 'simulated agents'})`));
 }

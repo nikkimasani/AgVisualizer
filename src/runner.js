@@ -2,7 +2,7 @@
 // output. Used automatically when ANTHROPIC_API_KEY is set (MODE=sim forces the
 // simulator). Emits the same events as the simulator.
 
-import { PIPELINE, byId } from './agents.js';
+import { PIPELINE, byId } from '../public/shared/agents.js';
 
 const API = 'https://api.anthropic.com/v1/messages';
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5';
@@ -24,6 +24,11 @@ async function callClaude(system, user) {
 
 export async function runTask(office, task) {
   office.emit({ type: 'task', id: task.id, title: task.title, state: 'running' });
+  for (const id of PIPELINE) office.busy.add(id);
+  try { await run(office, task); } finally { for (const id of PIPELINE) office.busy.delete(id); }
+}
+
+async function run(office, task) {
   let prev = null;
   let context = '';
   for (const id of PIPELINE) {
@@ -42,7 +47,7 @@ export async function runTask(office, task) {
       office.emit({ type: 'status', agent: id, status: 'done' });
     } catch (err) {
       office.emit({ type: 'say', agent: id, text: String(err.message) });
-      office.emit({ type: 'status', agent: id, status: 'blocked', task: 'API error' });
+      office.emit({ type: 'status', agent: id, status: 'blocked', blocker: 'API error' });
       office.emit({ type: 'task_update', id: task.id, state: 'failed' });
       return;
     }
