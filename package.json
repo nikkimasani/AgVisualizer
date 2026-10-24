@@ -1,0 +1,12 @@
+{
+  "name": "agvisualizer",
+  "version": "0.1.0",
+  "description": "A pixel-art office where every AI agent is an NPC you can watch work, hand off, and get blocked.",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/"
+  }
+}

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgVisualizer</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>AgVisualizer</h1>
+  <span id="mode" class="badge">connecting…</span>
+</header>
+<main>
+  <section class="stage">
+    <canvas id="office" width="960" height="600" aria-label="Office floor with agent characters"></canvas>
+    <form id="taskForm">
+      <input id="taskInput" type="text" maxlength="140" placeholder="Give the team a task, e.g. “Add dark mode to the settings page”" autocomplete="off" required>
+      <button type="submit">Dispatch</button>
+    </form>
+  </section>
+  <aside>
+    <h2>Team</h2>
+    <ul id="agents" class="agents"></ul>
+    <h2 id="detailTitle">Activity</h2>
+    <ol id="feed" class="feed"></ol>
+  </aside>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>

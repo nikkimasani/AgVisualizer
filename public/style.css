@@ -1,0 +1,36 @@
+:root {
+  --bg: #12141c; --panel: #1b1f2c; --line: #2c3246; --text: #e8eaf2; --muted: #9aa3bd;
+  --idle: #6b7390; --thinking: #f9c74f; --working: #4cc9f0; --blocked: #f94144; --done: #90be6d;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; }
+header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+h1 { font-size: 18px; margin: 0; letter-spacing: .02em; }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 16px 0 8px; }
+.badge { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); }
+.badge.live { color: var(--done); border-color: var(--done); }
+.badge.sim { color: var(--thinking); border-color: var(--thinking); }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; padding: 16px; max-width: 1400px; margin: 0 auto; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+canvas { width: 100%; height: auto; display: block; border-radius: 10px; border: 1px solid var(--line); image-rendering: pixelated; background: #222639; }
+#taskForm { display: flex; gap: 8px; margin-top: 12px; }
+input { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font: inherit; }
+button { padding: 10px 16px; border-radius: 8px; border: 0; background: #4cc9f0; color: #08202a; font: inherit; font-weight: 600; cursor: pointer; }
+button:hover { filter: brightness(1.1); }
+aside { min-width: 0; }
+aside > h2:first-child { margin-top: 0; }
+ul, ol { list-style: none; margin: 0; padding: 0; }
+.agents li { display: grid; grid-template-columns: 14px 1fr auto; gap: 2px 10px; align-items: center; padding: 8px 10px; margin-bottom: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.agents li.sel { border-color: var(--text); }
+.dot { width: 12px; height: 12px; border-radius: 50%; background: var(--idle); grid-row: span 2; }
+.dot.thinking { background: var(--thinking); } .dot.working { background: var(--working); }
+.dot.blocked { background: var(--blocked); } .dot.done { background: var(--done); }
+.name { font-weight: 600; } .name small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+.stat { color: var(--muted); font-size: 12px; text-align: right; }
+.sub { grid-column: 2 / 4; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.feed { max-height: 300px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.feed li { padding: 6px 10px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.feed li:last-child { border-bottom: 0; }
+.feed .who { font-weight: 600; margin-right: 6px; }
+.feed .k { color: var(--muted); }
+.feed:empty::before { content: "Nothing yet — dispatch a task."; display: block; padding: 10px; color: var(--muted); font-size: 12px; }
