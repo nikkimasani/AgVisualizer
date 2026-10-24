@@ -65,6 +65,12 @@ Add the hooks from `hooks/settings.example.json` to `~/.claude/settings.json` (r
 - the hook script has an 800 ms timeout and swallows errors, so it never slows or breaks Claude Code
 - actions that need the real agent (answering a permission prompt) are view-only: do them in the terminal
 
+### Claude Code on the web (cloud sessions)
+
+This repo ships `.claude/settings.json`, so any Claude Code session opened **on this repo** (cloud or local) reports to
+the office. Set `AGVIS_URL` (your relay URL, secret included) as an environment variable in the cloud environment's
+settings; with it unset the hooks quietly do nothing. Other repos need the same file and variable.
+
 ### Hosted UI + relay (Cloudflare Worker)
 
 Your hooks run on your machine; a hosted page can't see it. `relay/` is a Cloudflare Worker + Durable Object that
