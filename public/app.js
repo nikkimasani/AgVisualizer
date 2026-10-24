@@ -3,7 +3,7 @@
 
 import { View, drawFloor, sceneItems, drawAgent, drawBadge, drawNameTag, drawBubble, drawRoomLabels, drawCat, STATUS_ICON, FONT } from './render.js';
 import { GRID, SEATS, SPOTS, CORRIDOR_Y, ENTRANCE, ROOMS } from './shared/layout.js';
-import { connect } from './source.js';
+import { connect, saved, cleanUrl } from './source.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('floor'), ctx = canvas.getContext('2d');
@@ -182,6 +182,8 @@ function applySnapshot(snap) {
   $('modeNote').textContent = snap.mode === 'demo'
     ? 'This is a simulated office running entirely in your browser — no server, no data leaves your device. Answer decisions, collect branches, and welcome walk-ins to play with it.'
     : 'Connected to an AgVisualizer server. State comes from real agent events; actions that need a real agent (like Claude Code permission prompts) must be answered in the agent itself.';
+  $('taskForm').hidden = snap.mode === 'hooks';           // dispatching tasks only makes sense for the demo / API agents
+  for (const a of snap.agents) if (['asking', 'ready', 'dark', 'blocked'].includes(a.status)) noteTransition('idle', a);
   refresh(); renderWalkin();
 }
 
@@ -410,6 +412,14 @@ $('needsBtn').onclick = () => { renderInbox(); open('inboxModal'); };
 $('legendPill').onclick = $('menuBtn').onclick = () => open('legendModal');
 $('collapse').onclick = () => { const c = $('activity').classList.toggle('collapsed'); $('collapse').textContent = c ? '▴' : '▾'; };
 $('timeBtn').onclick = () => { S.time = { auto: 'day', day: 'dusk', dusk: 'night', night: 'auto' }[S.time]; renderClock(); toast(S.time === 'auto' ? 'Office time follows your clock' : `Forced ${S.time}`); };
+$('connUrl').value = '';
+$('connForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const u = cleanUrl($('connUrl').value);
+  if (!/^https?:\/\//.test(u)) return toast('That doesn’t look like a URL');
+  saved.set(u); location.href = location.pathname;
+});
+$('connDemo').onclick = () => { saved.set(''); location.href = location.pathname + '?demo'; };
 $('walkinYes').onclick = () => answerWalkin(true); $('walkinNo').onclick = () => answerWalkin(false);
 $('taskForm').addEventListener('submit', async (e) => {
   e.preventDefault(); const input = $('taskInput'), title = input.value.trim(); if (!title) return;

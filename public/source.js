@@ -52,9 +52,22 @@ async function probeSameOrigin() {
   } catch { return false; }
 }
 
+// The relay URL contains the room secret, so it lives only in this browser (localStorage) and is
+// scrubbed from the address bar as soon as we've read it.
+const KEY = 'agvis.server';
+export const saved = {
+  get() { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } },
+  set(v) { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch { /* private mode */ } },
+};
+export const cleanUrl = (u) => String(u || '').trim().replace(/\/$/, '');
+
 export async function connect(h) {
-  const server = params.get('server');
-  if (server) return remote(server.replace(/\/$/, ''), h);
+  let server = cleanUrl(params.get('server'));
+  if (server) {
+    saved.set(server);
+    history.replaceState(null, '', location.pathname + location.hash);
+  } else if (!params.has('demo')) server = saved.get();
+  if (server) return remote(server, h);
   if (!params.has('demo') && await probeSameOrigin()) return remote('', h);
   return local(h);
 }

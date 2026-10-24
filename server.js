@@ -16,7 +16,7 @@ import { randomUUID } from 'node:crypto';
 import { Office } from './public/shared/state.js';
 import { simulateTask, startDemo } from './public/shared/demo.js';
 import { runTask } from './src/runner.js';
-import { handleHook, startDarkSweeper } from './src/hooks.js';
+import { handleHook, startDarkSweeper } from './public/shared/hooks.js';
 
 const ROOT = fileURLToPath(new URL('./public/', import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;

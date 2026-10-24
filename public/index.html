@@ -61,6 +61,11 @@
   <div class="shead"><b>What you're seeing</b><button class="icon sm" data-close>✕</button></div>
   <ul class="legend" id="legendList"></ul>
   <p class="fine" id="modeNote"></p>
+  <form id="connForm" class="conn">
+    <label for="connUrl"><b>Show my real Claude Code sessions</b><small>Paste your relay URL (it contains your secret, so it stays in this browser only).</small></label>
+    <input id="connUrl" type="url" placeholder="https://agvisualizer-relay.you.workers.dev/r/…" autocomplete="off">
+    <div class="row"><button type="submit" class="abtn">Connect</button><button type="button" id="connDemo" class="abtn ghost">Use the demo</button></div>
+  </form>
 </div></div>
 
 <div id="toast" hidden></div>

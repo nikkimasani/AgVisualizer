@@ -45,11 +45,8 @@ The UI is static, so both work with **no build step**:
 A hosted copy runs the **demo inside the visitor's browser** (the same state + director code the server uses,
 shared from `public/shared/`). Nothing is sent anywhere.
 
-To point a hosted UI at a live backend, add `?server=https://your-backend` to the URL. The backend must allow the
-page's origin: `ALLOW_ORIGIN=https://your-site.pages.dev npm run start:hooks`. A hosted page reaching a server on
-your own machine (`?server=http://127.0.0.1:3000`) works in Chrome/Firefox but not Safari (mixed content), and has
-not been tested end to end. For Claude Code sessions on a different machine than the browser you'd want a small
-relay (e.g. a Cloudflare Worker + Durable Object that accepts the hook POSTs and fans out SSE) — not built yet.
+To show **your real Claude Code sessions** on a hosted page, deploy the relay (below) and paste its URL into the
+page's menu (☰ → *Show my real Claude Code sessions*). The URL is stored only in that browser.
 
 ## Real Claude Code sessions (hooks)
 
@@ -68,7 +65,34 @@ Add the hooks from `hooks/settings.example.json` to `~/.claude/settings.json` (r
 - the hook script has an 800 ms timeout and swallows errors, so it never slows or breaks Claude Code
 - actions that need the real agent (answering a permission prompt) are view-only: do them in the terminal
 
-The server binds `127.0.0.1` (`HOST` to change) and refuses cross-origin POSTs unless listed in `ALLOW_ORIGIN`.
+### Hosted UI + relay (Cloudflare Worker)
+
+Your hooks run on your machine; a hosted page can't see it. `relay/` is a Cloudflare Worker + Durable Object that
+receives the hook events and streams them to any page you open. Deploy it once:
+
+```bash
+cd relay
+npx wrangler deploy                                   # prints https://agvisualizer-relay.<you>.workers.dev
+openssl rand -hex 16                                  # your room secret, e.g. 3f9c…
+npx wrangler secret put ALLOWED_ROOMS                 # paste the secret (only listed rooms are accepted)
+```
+
+Then on each machine that runs Claude Code, set (shell profile or the `env` block of `settings.json`):
+
+```bash
+export AGVIS_URL=https://agvisualizer-relay.<you>.workers.dev/r/<secret>
+```
+
+…and open your hosted UI, ☰ → paste the same URL. Or use `?server=<that URL>` once.
+
+- **The URL is the password** (a capability URL): anyone with it can watch and post. Rotate by changing the secret.
+- **Privacy:** to a non-local `AGVIS_URL` the hook sends *minimal* data — tool **names**, project folder name,
+  branch / ahead / uncommitted counts, and Claude's notification text. No prompts, file paths, commands or replies
+  (`AGVIS_SHARE=full` opts in). Git facts are read on your machine, never by the relay.
+- Room state lives in memory in the Durable Object: if it's evicted, agents re-appear on their next event.
+- Limits: 16 KB bodies, 40 events/s per room. Actions that need the real agent stay view-only.
+
+The local server binds `127.0.0.1` (`HOST` to change) and refuses cross-origin POSTs unless listed in `ALLOW_ORIGIN`.
 
 ## Live Claude agents
 
@@ -94,11 +118,11 @@ Penny) as real Claude calls. `MODE=sim` forces the simulation. *Not yet exercise
 public/                static site (this is what you deploy)
   index.html style.css app.js render.js source.js
   shared/              pure ES modules used by BOTH browser and server
-    agents.js state.js demo.js layout.js
+    agents.js state.js demo.js layout.js hooks.js   (hooks.js = Claude Code payload -> events)
+relay/                 Cloudflare Worker + Durable Object relay (wrangler.toml, worker.js, room.js)
 server.js              optional Node server: SSE + API + hooks endpoint
-src/hooks.js           Claude Code hook payload -> events (+ git facts, dark sweeper)
 src/runner.js          real Claude-backed pipeline
 hooks/                 hook script + example settings
 ```
 
-`npm test` runs the state, inbox-action and hook-mapping tests.
+`npm test` runs the state, inbox-action, hook-mapping and relay tests.

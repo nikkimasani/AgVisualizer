@@ -1,0 +1,17 @@
+name = "agvisualizer-relay"
+main = "worker.js"
+compatibility_date = "2025-03-01"
+
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "OfficeRoom"
+
+# SQLite-backed Durable Objects are available on the free plan.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["OfficeRoom"]
+
+# Optional, recommended: set these as secrets/vars instead of committing them.
+#   npx wrangler secret put ALLOWED_ROOMS      # comma-separated room secrets that may be used
+#   [vars] ALLOW_ORIGIN = "https://your-site.pages.dev"   # lock CORS to your hosted UI (default "*")
+#   [vars] DARK_AFTER_SECONDS = "120"
