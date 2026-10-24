@@ -43,6 +43,13 @@
   </section>
 
   <aside id="inspect" class="card" hidden></aside>
+
+  <section id="editTray" class="card" hidden>
+    <div class="ehead"><b>🛋️ Edit Office</b><span id="editHint"></span>
+      <div class="erow"><button id="editUndo" class="icon sm" aria-label="Undo">↩</button><button id="editReset" class="icon sm" aria-label="Reset layout">⟲</button><button id="editDone" class="abtn">Done</button></div></div>
+    <div id="editActions" class="erow" hidden><button id="actRotate" class="abtn alt">↻ Rotate</button><button id="actMove" class="abtn alt">✋ Move</button><button id="actRemove" class="abtn ghost">🗑 Remove</button></div>
+    <div id="editCards" class="icards"></div>
+  </section>
 </main>
 
 <div id="inboxModal" class="modal" hidden><div class="sheet card">
@@ -66,6 +73,21 @@
     <input id="connUrl" type="url" placeholder="https://agvisualizer-relay.you.workers.dev/r/…" autocomplete="off">
     <div class="row"><button type="submit" class="abtn">Connect</button><button type="button" id="connDemo" class="abtn ghost">Use the demo</button></div>
   </form>
+</div></div>
+
+<div id="toolboxModal" class="modal" hidden><div class="sheet card wide">
+  <div class="shead"><b>🧰 Toolbox</b><button class="icon sm" data-close>✕</button></div>
+  <div id="toolboxBody"></div>
+</div></div>
+
+<div id="mgrModal" class="modal" hidden><div class="sheet card wide">
+  <div class="shead"><b>✨ Agent Manager</b><button class="icon sm" data-close>✕</button></div>
+  <div id="mgrBody"></div>
+</div></div>
+
+<div id="partyModal" class="modal" hidden><div class="sheet card">
+  <div class="shead"><b>🎉 Party planner</b><button class="icon sm" data-close>✕</button></div>
+  <div id="partyBody"></div>
 </div></div>
 
 <div id="toast" hidden></div>

@@ -4,13 +4,21 @@
 import { View, drawFloor, sceneItems, drawAgent, drawBadge, drawNameTag, drawBubble, drawRoomLabels, drawCat, STATUS_ICON, FONT } from './render.js';
 import { GRID, SEATS, SPOTS, CORRIDOR_Y, ENTRANCE, ROOMS } from './shared/layout.js';
 import { connect, saved, cleanUrl } from './source.js';
+import { setTheme, theme } from './theme.js';
+import { store } from './store.js';
+import * as edit from './edit.js';
+import * as fun from './fun.js';
+import * as looks from './looks.js';
+import * as toolbox from './toolbox.js';
+import { INTERACTIONS } from './shared/life.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('floor'), ctx = canvas.getContext('2d');
 const view = new View();
 const S = { agents: {}, order: [], walkins: [], feed: [], filter: 'all', selected: null, source: null, time: 'auto', mode: 'demo' };
 const npcs = {};
-const cat = { x: 26, y: 16, tx: 26, ty: 16, dir: 1, moving: false, wait: 2 };
+const cat = { x: 26, y: 16, tx: 26, ty: 16, dir: 1, moving: false, wait: 2, say: null, sayUntil: 0 };
+const { lookOf, nm } = looks;
 const SPEED = 2.3;           // tiles per second
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -56,6 +64,7 @@ function goHome(id) {
 
 function advance(n, dt) {
   n.walking = false;
+  if (n.trip?.kind === 'ufo') return;
   let budget = SPEED * dt;
   while (n.q.length && budget > 0) {
     const t = n.q[0];
@@ -70,8 +79,10 @@ function advance(n, dt) {
 
 const ACTIVITIES = ['kitchen', 'rec', 'lounge', 'garden'];
 function activity(id, long) {
+  const choice = long ? null : fun.chooseSpot(id);
+  if (choice) { startTrip(id, 'activity', choice.place, choice.dwell, () => fun.arrive(id, choice)); return; }
   const a = S.agents[id], room = pick(ACTIVITIES), sp = pick(SPOTS[room]);
-  startTrip(id, long ? 'bench' : 'activity', { ...sp, room }, long ? 1e9 : rand(6, 10), () => pushFeed({ cat: 'funny', icon: '🌷', id, text: `${a.name} ${sp.say}` }));
+  startTrip(id, long ? 'bench' : 'activity', { ...sp, room }, long ? 1e9 : rand(6, 10), () => pushFeed({ cat: 'funny', icon: '🌷', id, text: `${nm(a)} ${sp.say}` }));
 }
 
 function update(dt, nowS) {
@@ -88,6 +99,7 @@ function update(dt, nowS) {
     if (a.status === 'bench') { activity(id, true); continue; }
     if (a.status === 'idle' && home.seat && nowS > n.nextIdle) { activity(id, false); n.nextIdle = nowS + rand(14, 28); }
   }
+  fun.update(dt, nowS);
   // the garden cat wanders
   if (cat.wait > 0) { cat.wait -= dt; cat.moving = false; }
   else {
@@ -110,17 +122,17 @@ function noteTransition(prev, a) {
   if (!prev || prev === a.status) return;
   const add = (c, icon, text) => pushFeed({ cat: c, icon, id: a.id, text, attn: c !== 'all' });
   switch (a.status) {
-    case 'ready': add('ready', '📦', `${a.name} has a branch ready${a.branch ? ' — ' + a.branch : ''}`); break;
-    case 'asking': add('decision', '❓', `${a.name} needs a call: ${a.decision?.id && a.decision.id !== 'ASK' ? a.decision.id + ' ' : ''}${a.decision?.q || ''}`); break;
-    case 'dark': add('dark', '🥀', `${a.name} went dark${a.note ? ' — ' + a.note : ''}`); break;
-    case 'blocked': add('all', '🚧', `${a.name} is blocked: ${a.blocker}`); break;
+    case 'ready': add('ready', '📦', `${nm(a)} has a branch ready${a.branch ? ' — ' + a.branch : ''}`); break;
+    case 'asking': add('decision', '❓', `${nm(a)} needs a call: ${a.decision?.id && a.decision.id !== 'ASK' ? a.decision.id + ' ' : ''}${a.decision?.q || ''}`); break;
+    case 'dark': add('dark', '🥀', `${nm(a)} went dark${a.note ? ' — ' + a.note : ''}`); break;
+    case 'blocked': add('all', '🚧', `${nm(a)} is blocked: ${a.blocker}`); break;
     case 'working':
-      if (prev === 'blocked') add('all', '🟢', `${a.name} is unblocked`);
-      else if (prev === 'dark') add('all', '✅', `${a.name} is back at the desk`);
-      else if (prev === 'asking') add('all', '💬', `${a.name} got an answer and is back to work`);
-      else if (['idle', 'bench'].includes(prev)) add('all', '⌨️', `${a.name} started ${a.task || 'working'}`);
+      if (prev === 'blocked') add('all', '🟢', `${nm(a)} is unblocked`);
+      else if (prev === 'dark') add('all', '✅', `${nm(a)} is back at the desk`);
+      else if (prev === 'asking') add('all', '💬', `${nm(a)} got an answer and is back to work`);
+      else if (['idle', 'bench'].includes(prev)) add('all', '⌨️', `${nm(a)} started ${a.task || 'working'}`);
       break;
-    case 'done': add('all', '🎉', `${a.name} finished ${a.task || 'a task'}`); break;
+    case 'done': add('all', '🎉', `${nm(a)} finished ${a.task || 'a task'}`); break;
     default:
   }
 }
@@ -136,7 +148,7 @@ function applyEvent(ev) {
       if (from && to && to.seat >= 0) {
         const rs = SEATS[to.seat];
         startTrip(from.id, 'handoff', { x: rs.x - 1.15, y: rs.y, room: rs.room, aisle: rs.aisle }, 1.1, null, true);
-        pushFeed({ cat: 'all', icon: '💌', id: from.id, text: `${from.name} passed work to ${to.name}` });
+        pushFeed({ cat: 'all', icon: '💌', id: from.id, text: `${nm(from)} passed work to ${nm(to)}` });
       }
       return;
     }
@@ -146,7 +158,7 @@ function applyEvent(ev) {
   const a = S.agents[ev.agent]; if (!a || !ev.state) return;
   const prev = a.status, prevAhead = a.ahead;
   Object.assign(a, ev.state);
-  if (ev.type === 'git' && a.ahead > prevAhead) pushFeed({ cat: 'all', icon: '⌨️', id: a.id, text: `${a.name} committed (${a.ahead} ahead${a.branch ? ' of ' + a.branch : ''})` });
+  if (ev.type === 'git' && a.ahead > prevAhead) pushFeed({ cat: 'all', icon: '⌨️', id: a.id, text: `${nm(a)} committed (${a.ahead} ahead${a.branch ? ' of ' + a.branch : ''})` });
   noteTransition(prev, a);
   refresh(a.id);
 }
@@ -156,13 +168,13 @@ function join(info) {
   const n = ensureNpc(info, { x: ENTRANCE.x, y: ENTRANCE.y });
   const home = homeOf(info);
   n.q = tag(route(n.place, home), home); n.trip = { kind: 'arrive' };
-  pushFeed({ cat: 'funny', icon: '🎀', id: info.id, text: `${info.name} joined the office as ${info.role}` });
+  pushFeed({ cat: 'funny', icon: '🎀', id: info.id, text: `${nm(info)} joined the office as ${info.role}` });
   refresh();
 }
 function leave(id) {
   const n = npcs[id], a = S.agents[id]; if (!n || !a) return;
   n.q = [...routeFromHere(n, { ...ENTRANCE, room: 'corridor' }), { fn: () => drop(id) }]; n.trip = { kind: 'leave' };
-  pushFeed({ cat: 'funny', icon: '👋', text: `${a.name} headed out` });
+  pushFeed({ cat: 'funny', icon: '👋', text: `${nm(a)} headed out` });
 }
 function drop(id) {
   delete npcs[id]; delete S.agents[id]; S.order = S.order.filter((x) => x !== id);
@@ -221,9 +233,9 @@ function renderInbox() {
   $('inboxList').innerHTML = needs().map((it) => {
     if (it.kind === 'walkin') return `<li><div class="t">🚪 <b>${esc(it.w.name)}</b> is at the door — ${esc(it.w.role)}</div><button class="abtn mint" data-walk="${it.w.id}" data-yes="1">Let them stay</button> <button class="abtn ghost" data-walk="${it.w.id}">Send away</button></li>`;
     const a = it.a, icon = STATUS_ICON[a.status];
-    const text = a.status === 'asking' ? `${a.name} needs a call: ${a.decision?.id && a.decision.id !== 'ASK' ? a.decision.id + ' ' : ''}${a.decision?.q}`
-      : a.status === 'ready' ? `${a.name} has a branch ready${a.branch ? ' — ' + a.branch : ''}${a.ahead ? ` (${a.ahead} ahead)` : ''}`
-      : a.status === 'dark' ? `${a.name} went dark${a.note ? ' — ' + a.note : ''}` : `${a.name} is blocked: ${a.blocker}`;
+    const text = a.status === 'asking' ? `${nm(a)} needs a call: ${a.decision?.id && a.decision.id !== 'ASK' ? a.decision.id + ' ' : ''}${a.decision?.q}`
+      : a.status === 'ready' ? `${nm(a)} has a branch ready${a.branch ? ' — ' + a.branch : ''}${a.ahead ? ` (${a.ahead} ahead)` : ''}`
+      : a.status === 'dark' ? `${nm(a)} went dark${a.note ? ' — ' + a.note : ''}` : `${nm(a)} is blocked: ${a.blocker}`;
     return `<li><div class="t">${icon} ${esc(text)}</div><small>waiting ${ago(a.since)}</small><div class="row">${actionButtons(a)}<button class="abtn ghost" data-show="${a.id}">Show me</button></div></li>`;
   }).join('');
 }
@@ -234,13 +246,14 @@ function renderInspect() {
   if (!a) { el.hidden = true; return; }
   el.hidden = false;
   const room = ROOMS[a.room]?.label || a.room;
-  el.innerHTML = `<div class="shead"><div><h3>${esc(a.name)}</h3><div class="role">${esc(a.role)} · ${esc(room)}</div></div><button class="icon sm" data-close-inspect>✕</button></div>
+  el.innerHTML = `<div class="shead"><div><h3>${esc(nm(a))}</h3><div class="role">${esc(a.role)} · ${esc(room)}</div></div><button class="icon sm" data-close-inspect>✕</button></div>
     <span class="stat">${STATUS_ICON[a.status] || '🌸'} ${STATUS_LABEL[a.status] || a.status}</span>
     <dl>${a.task ? `<dt>task</dt><dd>${esc(a.task)}</dd>` : ''}${a.tool ? `<dt>tool</dt><dd>${esc(a.tool)}</dd>` : ''}
     ${a.branch ? `<dt>branch</dt><dd>${esc(a.branch)}</dd>` : ''}${a.branch ? `<dt>ahead</dt><dd>${a.ahead || 0} commit${a.ahead === 1 ? '' : 's'}</dd><dt>uncommitted</dt><dd>${a.dirty || 0} file${a.dirty === 1 ? '' : 's'}</dd>` : ''}
     ${a.blocker ? `<dt>blocker</dt><dd>${esc(a.blocker)}</dd>` : ''}${a.decision ? `<dt>decision</dt><dd>${esc((a.decision.id !== 'ASK' ? a.decision.id + ' ' : '') + a.decision.q)}</dd>` : ''}
     ${a.note ? `<dt>note</dt><dd>${esc(a.note)}</dd>` : ''}<dt>tool calls</dt><dd>${a.toolCalls || 0}</dd><dt>finished</dt><dd>${a.tasksDone || 0}</dd></dl>
     <div class="row">${actionButtons(a)}</div>
+    <div class="funrow">${INTERACTIONS.slice(0, 5).map((i) => `<button data-fun="${i.id}" data-agent="${a.id}" title="${i.label}">${i.emoji}</button>`).join('')}<button data-look="${a.id}" class="abtn alt">✨ Customize</button></div>
     <ol class="alog">${S.feed.filter((f) => f.id === a.id).slice(0, 4).map((f) => `<li>${f.icon} ${esc(f.text)}</li>`).join('')}</ol>`;
 }
 
@@ -309,9 +322,10 @@ canvas.addEventListener('pointermove', (e) => {
 });
 canvas.addEventListener('pointerup', (e) => {
   pts.delete(e.pointerId);
-  if (drag && pts.size === 0 && drag.moved < 6) { const r = canvas.getBoundingClientRect(); pick2(e.clientX - r.left, e.clientY - r.top); }
+  if (drag && pts.size === 0 && drag.moved < 6) { const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; if (!edit.onTap(x, y) && !fun.tap(x, y)) pick2(x, y); }
   if (pts.size < 2 && drag) drag.pinch = 0;
 });
+canvas.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse' && e.buttons === 0) { const r = canvas.getBoundingClientRect(); edit.onHover(e.clientX - r.left, e.clientY - r.top); } });
 canvas.addEventListener('pointercancel', (e) => pts.delete(e.pointerId));
 canvas.addEventListener('wheel', (e) => { e.preventDefault(); const r = canvas.getBoundingClientRect(); zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top); }, { passive: false });
 const pinchDist = () => { const [a, b] = [...pts.values()]; return Math.hypot(a.x - b.x, a.y - b.y) || 1; };
@@ -350,8 +364,12 @@ function renderClock() {
 // ---------- frame ----------
 let last = 0;
 function frame(t) {
+  requestAnimationFrame(frame);
+  try { render(t); } catch (err) { console.error('frame failed', err); }
+}
+function render(t) {
   const dt = Math.min(0.1, (t - last) / 1000); last = t;
-  update(dt, t / 1000);
+  try { update(dt, t / 1000); } catch (err) { console.error('update failed', err); }
   const w = canvas.clientWidth, h = canvas.clientHeight;
   ctx.clearRect(0, 0, w, h);
   drawFloor(ctx, view);
@@ -359,19 +377,20 @@ function frame(t) {
   const items = sceneItems(view);
   for (const id of S.order) {
     const a = S.agents[id], n = npcs[id]; if (!a || !n) continue;
-    items.push({ key: n.x + n.y + 0.02, draw: () => { heads[id] = drawAgent(ctx, view, a, n, t, id === S.selected); if (n.carry) envelope(heads[id]); } });
+    items.push({ key: n.x + n.y + 0.02, draw: () => { heads[id] = drawAgent(ctx, view, lookOf(a), n, t, id === S.selected); if (n.carry) envelope(heads[id]); } });
   }
   items.push({ key: cat.x + cat.y, draw: () => drawCat(ctx, view, cat, t) });
+  items.push(...edit.sceneItems(view, fun.fxFor), ...fun.sceneItems(view));
   items.sort((p, q) => p.key - q.key).forEach((i) => i.draw(ctx));
   drawRoomLabels(ctx, view);
   const tint = TINT[timeOfDay().phase];
-  if (tint) { ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = tint; ctx.fillRect(0, 0, w, h); ctx.restore(); }
+  if (tint && !theme.t.dark) { ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = tint; ctx.fillRect(0, 0, w, h); ctx.restore(); }
   // Bubbles: all of them when zoomed in; zoomed out only the three agents who have waited longest.
   const waiting = S.order.map((i) => S.agents[i]).filter((a) => a && ['asking', 'ready', 'dark', 'blocked'].includes(a.status)).sort((p, q) => p.since - q.since);
   const bubbled = new Set(view.s > 0.85 ? waiting.map((a) => a.id) : waiting.slice(0, 3).map((a) => a.id));
   for (const id of S.order) {      // overlays: name tags, badges, bubbles (never occluded)
     const a = S.agents[id], n = npcs[id], hd = heads[id]; if (!a || !n || !hd) continue;
-    if (view.s > 0.3 || id === S.selected) drawNameTag(ctx, hd.x, hd.y + 62 * hd.u * 0.9 + 12, a.name, a.accent);
+    if (view.s > 0.3 || id === S.selected) drawNameTag(ctx, hd.x, hd.y + 62 * hd.u * 0.9 + 12, nm(a), lookOf(a).accent);
     const icon = STATUS_ICON[a.status];
     const attn = ['asking', 'ready', 'dark', 'blocked'].includes(a.status);
     drawBadge(ctx, hd.x, hd.y - 6 * hd.u, hd.u, icon, attn ? 'rgba(255,200,90,.45)' : null);
@@ -386,7 +405,7 @@ function frame(t) {
       else if (sel && a.tool) drawBubble(ctx, bx, by, a.tool, '#ece2ff');
     } else if (a.status === 'working' && a.tool && view.s > 0.75) drawBubble(ctx, bx, by, a.tool, '#ece2ff', '#4a2c4a', 150);
   }
-  requestAnimationFrame(frame);
+  fun.overlay(ctx, view, t); edit.overlay(ctx, view, t);
 }
 function envelope(hd) {
   const x = hd.x + 14 * hd.u, y = hd.y + 26 * hd.u, w = 15 * hd.u;
@@ -402,6 +421,8 @@ document.addEventListener('click', (e) => {
   const t = e.target.closest('button, li'); if (!t) return;
   if (t.matches('[data-close]')) t.closest('.modal').hidden = true;
   else if (t.matches('[data-close-inspect]')) select(null);
+  else if (t.dataset.fun && t.dataset.agent) fun.interact(t.dataset.agent, t.dataset.fun) && renderInspect();
+  else if (t.dataset.look && !t.closest('#mgrModal')) looks.openManager(t.dataset.look);
   else if (t.dataset.act) doAct(t.dataset.agent, t.dataset.act, t.dataset.choice);
   else if (t.dataset.walk) S.source.walkin(t.dataset.walk, Boolean(t.dataset.yes)).then((r) => r?.error && toast(r.error));
   else if (t.dataset.show) { $('inboxModal').hidden = true; select(t.dataset.show); focus(t.dataset.show); }
@@ -409,7 +430,8 @@ document.addEventListener('click', (e) => {
   else if (t.closest('#tabs') && t.dataset.f) { S.filter = t.dataset.f; document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b === t)); renderFeed(); }
 });
 $('needsBtn').onclick = () => { renderInbox(); open('inboxModal'); };
-$('legendPill').onclick = $('menuBtn').onclick = () => open('legendModal');
+$('legendPill').onclick = () => open('legendModal');
+$('menuBtn').onclick = () => toolbox.open();
 $('collapse').onclick = () => { const c = $('activity').classList.toggle('collapsed'); $('collapse').textContent = c ? '▴' : '▾'; };
 $('timeBtn').onclick = () => { S.time = { auto: 'day', day: 'dusk', dusk: 'night', night: 'auto' }[S.time]; renderClock(); toast(S.time === 'auto' ? 'Office time follows your clock' : `Forced ${S.time}`); };
 $('connUrl').value = '';
@@ -437,6 +459,11 @@ document.querySelectorAll('.modal').forEach((m) => m.addEventListener('click', (
 addEventListener('resize', () => { resize(); });
 if (mobile()) $('activity').classList.add('collapsed');
 
+const C = { S, npcs, view, canvas, ctx, cat, fun, fx: { sparkle: fun.sparkle },
+  h: { route, routeFromHere, tag, startTrip, goHome, advance, homeOf, hash, rand, pick, toast, pushFeed, select, focus, nm, refreshPanels: () => refresh(), refresh: () => { refresh(); looks.refreshManager(); } } };
+setTheme(store.get('theme', 'blossom'), false);
+edit.initEdit(C); fun.initFun(C); looks.initLooks(C); toolbox.initToolbox(C);
+window.agv = C;     // handy for poking around in the console
 resize(); renderClock(); setInterval(renderClock, 15000);
 setInterval(() => { if (!$('inboxModal').hidden) renderInbox(); }, 5000);
 connect({ onSnapshot: applySnapshot, onEvent: applyEvent, onStatus: (m) => { $('mode').textContent = m; } }).then((src) => { S.source = src; });
