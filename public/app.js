@@ -27,11 +27,16 @@ function ensureNpc(a) {
 
 function applySnapshot(snap) {
   state.agents = {}; state.order = [];
+  for (const id of Object.keys(npcs)) if (!snap.agents.some((a) => a.id === id)) delete npcs[id];
   for (const a of snap.agents) { state.agents[a.id] = a; state.order.push(a.id); ensureNpc(a); }
   renderCards();
 }
 
+const DOOR = { x: 480, y: 540 };
+
 function applyEvent(ev) {
+  if (ev.type === 'agent_join') return join(ev.info);
+  if (ev.type === 'agent_leave') return leave(ev.id);
   const a = state.agents[ev.agent];
   switch (ev.type) {
     case 'status':
@@ -57,6 +62,29 @@ function applyEvent(ev) {
     case 'task': case 'task_update': break;
   }
   renderCards();
+}
+
+// New agents walk in from the door to their desk.
+function join(info) {
+  state.agents[info.id] = info; state.order.push(info.id);
+  const n = ensureNpc(info);
+  n.x = DOOR.x; n.y = DOOR.y;
+  const out = routeTo(info, DOOR);
+  n.trip = { out: [], back: [...out].reverse().slice(1).concat([{ x: n.home.x, y: n.home.y }]), wait: 0, carry: false, stage: 'back', arriving: true };
+  renderCards();
+}
+
+function leave(id) {
+  const n = npcs[id], a = state.agents[id];
+  if (!n || !a) return;
+  n.trip = { out: [], back: routeTo(a, DOOR), wait: 0, carry: false, stage: 'back', leaving: true };
+  if (state.selected === id) state.selected = null;
+}
+
+function drop(id) {
+  delete npcs[id]; delete state.agents[id];
+  state.order = state.order.filter((x) => x !== id);
+  renderCards(); renderFeed();
 }
 
 function pushFeed(a, kind, text) {
@@ -107,13 +135,16 @@ function step(dt, now) {
 
     if (n.trip) {
       const t = n.trip;
-      if (!t.carry && active && t.stage !== 'back') t.stage = 'back', t.out = [];   // got work: head home
+      if (!t.carry && active && t.stage !== 'back' && !t.arriving) t.stage = 'back', t.out = [];   // got work: head home
       if (t.stage === 'out') {
         if (moveAlong(n, t.out, dt)) { t.stage = 'wait'; n.waitLeft = t.wait; }
       } else if (t.stage === 'wait') {
         n.waitLeft -= dt;
         if (n.waitLeft <= 0) { t.stage = 'back'; n.carry = false; }
-      } else if (moveAlong(n, t.back, dt)) { n.trip = null; n.wanderAt = 8 + Math.random() * 10; }
+      } else if (moveAlong(n, t.back, dt)) {
+        if (t.leaving) { drop(id); continue; }
+        n.trip = null; n.wanderAt = 8 + Math.random() * 10;
+      }
       continue;
     }
     n.walking = false;
@@ -281,10 +312,14 @@ const $mode = document.getElementById('mode');
 const es = new EventSource('/api/stream');
 es.addEventListener('snapshot', (e) => {
   const snap = JSON.parse(e.data); applySnapshot(snap);
-  $mode.textContent = snap.mode === 'live' ? 'live Claude agents' : 'simulated agents';
-  $mode.className = 'badge ' + snap.mode;
+  $mode.textContent = { live: 'live Claude agents', hooks: 'watching Claude Code', sim: 'simulated agents' }[snap.mode];
+  $mode.className = 'badge ' + (snap.mode === 'sim' ? 'sim' : 'live');
 });
-es.addEventListener('event', (e) => { const ev = JSON.parse(e.data); if (ev.agent ? state.agents[ev.agent] : ev.from || ev.type.startsWith('task')) applyEvent(ev); });
+es.addEventListener('event', (e) => {
+  const ev = JSON.parse(e.data);
+  const known = ev.agent ? state.agents[ev.agent] : ev.from ? state.agents[ev.from] && state.agents[ev.to] : true;
+  if (known) applyEvent(ev);
+});
 es.onerror = () => { $mode.textContent = 'reconnecting…'; $mode.className = 'badge'; };
 
 requestAnimationFrame(frame);

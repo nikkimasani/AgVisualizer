@@ -6,14 +6,18 @@ import { AGENTS } from './agents.js';
 
 const STATUSES = new Set(['idle', 'thinking', 'working', 'blocked', 'done']);
 const LOG_LIMIT = 40;
+export const DESK_COUNT = 6;
+const PALETTE = ['#4cc9f0', '#f9c74f', '#90be6d', '#f8961e', '#f94144', '#c77dff', '#43aa8b', '#ff8fab'];
 
 export class Office {
-  constructor() {
+  // empty: start with no agents; they join dynamically (used for live Claude Code hooks).
+  constructor({ empty = false } = {}) {
     this.listeners = new Set();
     this.seq = 0;
+    this.joined = 0;
     this.tasks = [];
     this.agents = Object.fromEntries(
-      AGENTS.map((a) => [a.id, {
+      (empty ? [] : AGENTS).map((a) => [a.id, {
         id: a.id, name: a.name, role: a.role, color: a.color, desk: a.desk,
         status: 'idle', task: null, tool: null, toolCalls: 0, tasksDone: 0, log: [],
       }]),
@@ -61,6 +65,23 @@ export class Office {
       case 'handoff':
         need(this.agents[ev.from] && this.agents[ev.to], 'handoff needs valid from/to');
         this.#log(this.agents[ev.from], 'handoff', `→ ${this.agents[ev.to].name}${ev.note ? ': ' + ev.note : ''}`);
+        break;
+      case 'agent_join': {
+        const i = ev.info;
+        need(i && typeof i.id === 'string' && i.id && !this.agents[i.id], 'agent_join needs a new id');
+        const taken = new Set(Object.values(this.agents).map((x) => x.desk));
+        const desk = [...Array(DESK_COUNT).keys()].find((d) => !taken.has(d));
+        need(desk !== undefined, 'office is full');
+        ev.info = this.agents[i.id] = {
+          id: i.id, name: String(i.name || i.id).slice(0, 16), role: String(i.role || 'Agent').slice(0, 24),
+          color: i.color || PALETTE[this.joined++ % PALETTE.length], desk,
+          status: 'idle', task: null, tool: null, toolCalls: 0, tasksDone: 0, log: [],
+        };
+        break;
+      }
+      case 'agent_leave':
+        need(this.agents[ev.id], `unknown agent "${ev.id}"`);
+        delete this.agents[ev.id];
         break;
       case 'task':
         need(typeof ev.title === 'string' && ev.title, 'title required');

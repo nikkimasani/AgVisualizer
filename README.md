@@ -34,6 +34,25 @@ needs a free desk slot in `public/app.js` (`deskPos`, currently a 3×2 grid).
 
 `SIM_SPEED=3 npm start` speeds up the simulation. `PORT` changes the port.
 
+## Watch real Claude Code sessions (hooks)
+
+```bash
+npm run start:hooks     # empty office; agents appear as Claude Code sessions report in
+```
+
+Then add the hooks from `hooks/settings.example.json` to `~/.claude/settings.json` (user-wide) or a
+project's `.claude/settings.json`, replacing `/ABSOLUTE/PATH/TO/AgVisualizer`. Run `claude` anywhere and:
+
+- each session becomes an NPC named after its project folder; each subagent gets its own NPC that walks
+  in from the door, receives a hand-off from its parent, and leaves when it finishes
+- prompt → thinking, tool call → working (bubble shows the tool, feed shows the file/command),
+  `Notification` (permission prompt / waiting for input) → red **blocked**, `Stop` → done then idle
+- the hook script (`hooks/agvis-hook.js`) has an 800 ms timeout and swallows every error, so Claude Code
+  is never slowed or broken if the office isn't running. `AGVIS_PORT` changes the port it targets.
+
+The server listens on `127.0.0.1` only (`HOST` to change) and rejects cross-origin browser POSTs.
+Up to six agents fit; when full, an idle agent is evicted to make room.
+
 ## Drive it from your own agents
 
 The office is just an event stream. Anything can `POST /api/events`:
@@ -61,6 +80,8 @@ src/agents.js     roster and pipeline
 src/state.js      office state + event validation
 src/simulator.js  scripted fake work
 src/runner.js     real Claude-backed pipeline
+src/hooks.js      Claude Code hook payload -> office events
+hooks/            hook script + example settings
 public/           canvas renderer (app.js) and UI
 ```
 

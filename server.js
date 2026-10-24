@@ -3,6 +3,7 @@
 //   GET  /api/state    current snapshot
 //   GET  /api/stream   Server-Sent Events (snapshot, then every event)
 //   POST /api/events   push an event from any agent/hook  (see src/state.js)
+//   POST /api/hooks    Claude Code hook payload (see hooks/agvis-hook.js)
 //   POST /api/tasks    {"title": "..."} run a task through the team
 
 import http from 'node:http';
@@ -13,14 +14,17 @@ import { randomUUID } from 'node:crypto';
 import { Office } from './src/state.js';
 import { simulateTask } from './src/simulator.js';
 import { runTask } from './src/runner.js';
+import { handleHook } from './src/hooks.js';
 
 const ROOT = fileURLToPath(new URL('./public/', import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
+const HOST = process.env.HOST || '127.0.0.1'; // endpoints are unauthenticated: stay on loopback by default
+const HOOKS = process.env.OFFICE_MODE === 'hooks';
 const SPEED = Number(process.env.SIM_SPEED) || 1;
 const REAL = Boolean(process.env.ANTHROPIC_API_KEY) && process.env.MODE !== 'sim';
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json' };
 
-export const office = new Office();
+export const office = new Office({ empty: HOOKS });
 
 function json(res, code, body) {
   res.writeHead(code, { 'content-type': 'application/json' });
@@ -58,11 +62,21 @@ export const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && req.url === '/api/stream') {
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
       const send = (name, data) => res.write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
-      send('snapshot', { ...office.snapshot(), mode: REAL ? 'live' : 'sim' });
+      send('snapshot', { ...office.snapshot(), mode: HOOKS ? 'hooks' : REAL ? 'live' : 'sim' });
       const off = office.subscribe((ev) => send('event', ev));
       const ping = setInterval(() => res.write(': ping\n\n'), 15000);
       req.on('close', () => { off(); clearInterval(ping); });
       return;
+    }
+
+    // Block cross-site POSTs from web pages; curl, hooks and our own page send no foreign Origin.
+    if (req.method === 'POST' && req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) {
+      return json(res, 403, { error: 'cross-origin request refused' });
+    }
+
+    if (req.method === 'POST' && req.url === '/api/hooks') {
+      try { return json(res, 200, handleHook(office, await readBody(req))); }
+      catch (err) { return json(res, 400, { error: err.message }); }
     }
 
     if (req.method === 'POST' && req.url === '/api/events') {
@@ -87,5 +101,5 @@ export const server = http.createServer(async (req, res) => {
 });
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  server.listen(PORT, () => console.log(`AgVisualizer → http://localhost:${PORT}  (${REAL ? 'live Claude agents' : 'simulated agents'})`));
+  server.listen(PORT, HOST, () => console.log(`AgVisualizer → http://localhost:${PORT}  (${HOOKS ? 'watching Claude Code hooks' : REAL ? 'live Claude agents' : 'simulated agents'})`));
 }
