@@ -364,8 +364,12 @@ function renderClock() {
 // ---------- frame ----------
 let last = 0;
 function frame(t) {
+  requestAnimationFrame(frame);
+  try { render(t); } catch (err) { console.error('frame failed', err); }
+}
+function render(t) {
   const dt = Math.min(0.1, (t - last) / 1000); last = t;
-  update(dt, t / 1000);
+  try { update(dt, t / 1000); } catch (err) { console.error('update failed', err); }
   const w = canvas.clientWidth, h = canvas.clientHeight;
   ctx.clearRect(0, 0, w, h);
   drawFloor(ctx, view);
@@ -402,7 +406,6 @@ function frame(t) {
     } else if (a.status === 'working' && a.tool && view.s > 0.75) drawBubble(ctx, bx, by, a.tool, '#ece2ff', '#4a2c4a', 150);
   }
   fun.overlay(ctx, view, t); edit.overlay(ctx, view, t);
-  requestAnimationFrame(frame);
 }
 function envelope(hd) {
   const x = hd.x + 14 * hd.u, y = hd.y + 26 * hd.u, w = 15 * hd.u;
@@ -457,7 +460,7 @@ addEventListener('resize', () => { resize(); });
 if (mobile()) $('activity').classList.add('collapsed');
 
 const C = { S, npcs, view, canvas, ctx, cat, fun, fx: { sparkle: fun.sparkle },
-  h: { route, routeFromHere, tag, startTrip, goHome, advance, homeOf, hash, rand, pick, toast, pushFeed, select, focus, nm, refresh: () => { refresh(); looks.refreshManager(); } } };
+  h: { route, routeFromHere, tag, startTrip, goHome, advance, homeOf, hash, rand, pick, toast, pushFeed, select, focus, nm, refreshPanels: () => refresh(), refresh: () => { refresh(); looks.refreshManager(); } } };
 setTheme(store.get('theme', 'blossom'), false);
 edit.initEdit(C); fun.initFun(C); looks.initLooks(C); toolbox.initToolbox(C);
 window.agv = C;     // handy for poking around in the console

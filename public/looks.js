@@ -36,7 +36,9 @@ export function initLooks(c) {
     if (e.target.id !== 'mgrName') return;
     const v = e.target.value.trim().slice(0, 14);
     if (v) (looks[mgrId] ||= {}).name = v; else if (looks[mgrId]) delete looks[mgrId].name;
-    save();
+    store.set('looks', looks); C.h.refreshPanels();       // not render(): that would rebuild (and defocus) this very input
+    const a = C.S.agents[mgrId];
+    if (a) { const h = m.querySelector('.mname h3'); if (h) h.textContent = nm(a); const chip = m.querySelector('.achip.on'); if (chip) chip.lastChild.textContent = nm(a); }
   });
   m.addEventListener('click', (e) => { if (e.target === m) close(); });
 }

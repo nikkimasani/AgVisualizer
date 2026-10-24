@@ -136,9 +136,11 @@ export function inviteVisitor() {
 }
 
 function greet(n, a) {
-  n.say = visitorQuip(n.def, a.status); n.sayUntil = nowMs() + 4200;
-  const an = C.npcs[a.id]; burst(an.x, an.y, 1.5, ['✨', '💖'], 6);
-  setTimeout(() => { if (an) { an.say = pick(['Aww, hi there!', 'Thanks for stopping by!', 'Hehe 💕']); an.sayUntil = nowMs() + 2600; } }, 1400);
+  const an = C.npcs[a.id];
+  if (!an || !C.S.agents[a.id]) { n.say = 'Oh! Nobody’s home…'; n.sayUntil = nowMs() + 2800; return; }   // she left while we walked over
+  n.say = visitorQuip(n.def, C.S.agents[a.id].status); n.sayUntil = nowMs() + 4200;
+  burst(an.x, an.y, 1.5, ['✨', '💖'], 6);
+  setTimeout(() => { if (C.npcs[a.id] === an) { an.say = pick(['Aww, hi there!', 'Thanks for stopping by!', 'Hehe 💕']); an.sayUntil = nowMs() + 2600; } }, 1400);
   C.h.pushFeed({ cat: 'funny', icon: '💬', id: a.id, text: `${n.def.name} to ${C.h.nm(a)}: “${n.say}”` });
 }
 
@@ -191,7 +193,12 @@ function startUfo() {
 }
 
 function updateUfo(t) {
-  const n = C.npcs[ufo.id]; if (!n) { ufo = null; return; }
+  const n = C.npcs[ufo.id], a = C.S.agents[ufo.id];
+  if (!n || !a) { ufo = null; return; }
+  if (!['idle', 'bench'].includes(a.status)) {      // real work resumed: call off the abduction
+    n.lift = 0; n.fade = undefined; n.trip = null; n.q = [];
+    const id = ufo.id; ufo = null; C.h.goHome(id); return;
+  }
   const s = (t - ufo.t0) / 1000;
   if (s < 2.2) { n.lift = 0; n.fade = undefined; }
   else if (s < 4.4) { const k = (s - 2.2) / 2.2; n.lift = k * 80; n.fade = 1 - k; }
