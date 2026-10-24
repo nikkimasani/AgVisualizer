@@ -229,13 +229,16 @@ export function drawBubble(ctx, x, y, text, bg = '#fff', fg = '#4a2c4a', maxW = 
 }
 
 export function drawRoomLabels(ctx, v) {
-  ctx.font = `800 ${Math.max(10, Math.min(14, 12 * v.s * 1.4))}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  if (v.s < 0.36) return;                           // zoomed all the way out: the floor colours say it all
+  const size = Math.max(7.5, Math.min(14, 12 * v.s * 1.4)), h = size + 9;
+  ctx.font = `800 ${size}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const r of Object.values(ROOMS)) {
     const [x, y] = v.p((r.x0 + r.x1) / 2, r.y1 - 0.9);
-    const w = ctx.measureText(r.label.toUpperCase()).width + 18;
-    ctx.beginPath(); ctx.roundRect(x - w / 2, y - 10, w, 20, 10); ctx.fillStyle = 'rgba(255,255,255,.78)'; ctx.fill();
+    const label = (v.s < 0.7 ? r.label.replace(/^(The|Pink|Café) /, '') : r.label).toUpperCase();
+    const w = ctx.measureText(label).width + size * 1.4;
+    ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2); ctx.fillStyle = 'rgba(255,255,255,.78)'; ctx.fill();
     ctx.strokeStyle = 'rgba(230,140,180,.7)'; ctx.lineWidth = 1.5; ctx.stroke();
-    ctx.fillStyle = '#9a4f7e'; ctx.fillText(r.label.toUpperCase(), x, y + 1);
+    ctx.fillStyle = '#9a4f7e'; ctx.fillText(label, x, y + 1);
   }
 }
 
