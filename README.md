@@ -35,6 +35,25 @@ Drag to pan, wheel / pinch to zoom, **N** = needs-me inbox, **C** = recenter, cl
 - Rooms: Pink Boardroom (planners / C-suite), Bullpen, Review + Security, Café Kitchen, Rec Room, Lounge, Garden (with a cat).
 - The 🌷 "funny" lines (ping-pong, tea, petting the cat) are decoration only; they never change real state.
 
+## Make it yours (the fun stuff)
+
+Tap **☰ Toolbox**. Everything here is saved in your browser only and never changes what real agents are doing.
+
+- **🛋️ Edit Office** — pick a card (ping-pong, pool, foosball, arcade, pinball, jukebox, dance floor, cozy console, bean bag,
+  sofa, boba cart, photo booth, rug, plants, lamps, flower arch, balloons, cat tower), tap the floor to place it. Tap a piece
+  to rotate / move / remove; ↩ undoes. Items can't go on desks, walkways or across walls.
+- **Agents use what you place** — idle agents walk to the furniture: two of them rally at the ping-pong table, someone
+  dances at the jukebox, naps on a bean bag, sips boba. Real work always interrupts instantly.
+- **✨ Agent Manager** — rename, restyle (hair, hair colour, dress, shoes, accessory), see mood / energy / friendship, and
+  hang out: head pats, cake, boba, dance party, high five, compliments, their favourite snack. Friendship levels up
+  Stranger → Friend → Bestie → Soulmate.
+- **🎨 Themes** — Blossom, Mint Garden, Lavender Dream, Peach Café, Midnight Candy.
+- **🎉 Party planner** — birthday cake (Fri 3pm), boba o'clock (daily 2pm), dance party (Fri 5pm), or start any now.
+  A friendly pink 🛸 UFO can borrow an agent on a break and bring her back.
+- **🎀 Visitors** — Santa, a Fairy Godmother, a Witchy Pumpkin and friends drop by, chat about how your agents are doing
+  (cheering a ready branch, comforting a blocked one) and wander the floor. Turn them off in the toolbox.
+- Tap the **office cat** in the garden to pet her.
+
 ## Deploying (Cloudflare Pages / Vercel)
 
 The UI is static, so both work with **no build step**:
@@ -122,13 +141,15 @@ Penny) as real Claude calls. `MODE=sim` forces the simulation. *Not yet exercise
 
 ```
 public/                static site (this is what you deploy)
-  index.html style.css app.js render.js source.js
+  index.html style.css app.js render.js furniture.js source.js
+  edit.js fun.js looks.js toolbox.js theme.js store.js   (Edit Office, fun layer, Agent Manager, toolbox, themes, saving)
   shared/              pure ES modules used by BOTH browser and server
     agents.js state.js demo.js layout.js hooks.js   (hooks.js = Claude Code payload -> events)
+    catalog.js placement.js life.js                 (furniture, where it may go, moods / friendship / calendar)
 relay/                 Cloudflare Worker + Durable Object relay (wrangler.toml, worker.js, room.js)
 server.js              optional Node server: SSE + API + hooks endpoint
 src/runner.js          real Claude-backed pipeline
 hooks/                 hook script + example settings
 ```
 
-`npm test` runs the state, inbox-action, hook-mapping and relay tests.
+`npm test` runs the state, inbox-action, hook-mapping, relay, placement, friendship and calendar tests.

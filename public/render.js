@@ -1,6 +1,7 @@
 // Isometric drawing: floor, furniture, little characters, speech bubbles. No state lives here.
 
-import { GRID, ROOMS, CORRIDOR_FLOOR, FURNITURE } from './shared/layout.js';
+import { GRID, ROOMS, FURNITURE } from './shared/layout.js';
+import { theme } from './theme.js';
 
 export const TW = 64, TH = 32, ZU = 34;   // tile width/height in px, px per unit of height
 export const STATUS_ICON = { working: '💻', thinking: '💭', blocked: '🚧', asking: '❓', ready: '📦', dark: '🥀', bench: '💤', done: '✅', idle: '' };
@@ -9,8 +10,8 @@ export const FONT = 'ui-rounded, "SF Pro Rounded", "Nunito", system-ui, sans-ser
 // ---------- colour + projection helpers ----------
 const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 export const mix = (h, t, to = 255) => '#' + rgb(h).map((v) => Math.round(v + (to - v) * t).toString(16).padStart(2, '0')).join('');
-const lighten = (h, t) => mix(h, t, 255);
-const darken = (h, t) => mix(h, t, 0);
+export const lighten = (h, t) => mix(h, t, 255);
+export const darken = (h, t) => mix(h, t, 0);
 
 export class View {
   constructor() { this.s = 1; this.ox = 0; this.oy = 0; }
@@ -18,7 +19,7 @@ export class View {
   inv(sx, sy) { const a = (sx - this.ox) / (TW / 2 * this.s), b = (sy - this.oy) / (TH / 2 * this.s); return [(a + b) / 2, (b - a) / 2]; }
 }
 
-function poly(ctx, pts, fill, stroke) {
+export function poly(ctx, pts, fill, stroke) {
   ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath();
   if (fill) { ctx.fillStyle = fill; ctx.fill(); }
   if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
@@ -31,21 +32,22 @@ export function box(ctx, v, x, y, w, d, h, c, z0 = 0) {
   poly(ctx, [v.p(x, y, z1), v.p(x + w, y, z1), v.p(x + w, y + d, z1), v.p(x, y + d, z1)], lighten(c, 0.12), 'rgba(255,255,255,.35)'); // top
 }
 
-function circle(ctx, x, y, r, fill) { ctx.beginPath(); ctx.arc(x, y, Math.max(0.5, r), 0, 7); ctx.fillStyle = fill; ctx.fill(); }
-function ellipse(ctx, x, y, rx, ry, fill, rot = 0) { ctx.beginPath(); ctx.ellipse(x, y, Math.max(0.5, rx), Math.max(0.5, ry), rot, 0, 7); ctx.fillStyle = fill; ctx.fill(); }
+export function circle(ctx, x, y, r, fill) { ctx.beginPath(); ctx.arc(x, y, Math.max(0.5, r), 0, 7); ctx.fillStyle = fill; ctx.fill(); }
+export function ellipse(ctx, x, y, rx, ry, fill, rot = 0) { ctx.beginPath(); ctx.ellipse(x, y, Math.max(0.5, rx), Math.max(0.5, ry), rot, 0, 7); ctx.fillStyle = fill; ctx.fill(); }
 
 // ---------- static scene ----------
 // Drawn first, in order: base plate, floors, rugs, back walls. Nothing here can overlap a character.
 export function drawFloor(ctx, v) {
   const { w, d } = GRID;
   const t = 0.8;   // plate thickness
-  const base = '#e8c7d8';
+  const base = theme.t.plate;
   poly(ctx, [v.p(0, d, 0), v.p(w, d, 0), v.p(w, d, -t), v.p(0, d, -t)], darken(base, 0.08));
   poly(ctx, [v.p(w, 0, 0), v.p(w, d, 0), v.p(w, d, -t), v.p(w, 0, -t)], darken(base, 0.2));
   const roomAt = (x, y) => Object.values(ROOMS).find((r) => x >= r.x0 && x < r.x1 && y >= r.y0 && y < r.y1);
   for (let y = 0; y < d; y++) for (let x = 0; x < w; x++) {
     const r = roomAt(x + 0.5, y + 0.5);
-    const pal = r ? r.floor : CORRIDOR_FLOOR;
+    const key = r && Object.keys(ROOMS).find((k) => ROOMS[k] === r);
+    const pal = r ? (theme.t.floors[key] || r.floor) : theme.t.corridor;
     poly(ctx, [v.p(x, y), v.p(x + 1, y), v.p(x + 1, y + 1), v.p(x, y + 1)], pal[(x + y) & 1]);
   }
   for (const it of FURNITURE) if (it.k === 'flat') {
@@ -61,9 +63,9 @@ export function drawFloor(ctx, v) {
   }
   // back walls (north + west), cream with a rose trim, soft windows and fairy lights
   const H = 1.9;
-  box(ctx, v, 0, -0.25, w, 0.25, H, '#fff1f6');
-  box(ctx, v, -0.25, 0, 0.25, d, H, '#fbe6ef');
-  box(ctx, v, 0, -0.25, w, 0.25, 0.12, '#f7b8d0', H); box(ctx, v, -0.25, 0, 0.25, d, 0.12, '#f4aac8', H);
+  box(ctx, v, 0, -0.25, w, 0.25, H, theme.t.wall[0]);
+  box(ctx, v, -0.25, 0, 0.25, d, H, theme.t.wall[1]);
+  box(ctx, v, 0, -0.25, w, 0.25, 0.12, theme.t.trim[0], H); box(ctx, v, -0.25, 0, 0.25, d, 0.12, theme.t.trim[1], H);
   for (let x = 2; x < w - 2; x += 4.5) {
     poly(ctx, [v.p(x, 0, 0.9), v.p(x + 2.4, 0, 0.9), v.p(x + 2.4, 0, 1.65), v.p(x, 0, 1.65)], '#cdeafc', '#fff');
     poly(ctx, [v.p(x + 1.2, 0, 0.9), v.p(x + 1.2, 0, 1.65)], null, '#fff');
@@ -81,11 +83,11 @@ export function sceneItems(v) {
   const items = [];
   for (const it of FURNITURE) {
     if (it.k === 'flat' || it.k === 'pond') continue;
-    const cx = it.k === 'box' || it.k === 'pingpong' ? it.x + it.w / 2 : it.x, cy = it.k === 'box' || it.k === 'pingpong' ? it.y + it.d / 2 : it.y;
+    const cx = it.k === 'box' ? it.x + it.w / 2 : it.x, cy = it.k === 'box' ? it.y + it.d / 2 : it.y;
     items.push({ key: cx + cy + (it.z || 0) * 0.01, draw: (ctx) => drawItem(ctx, v, it) });
   }
   // low dividers between rooms, as short segments so depth sorting stays honest
-  const seg = (x, y, w, d) => items.push({ key: x + w / 2 + y + d / 2, draw: (ctx) => box(ctx, v, x, y, w, d, 0.75, '#fbd3e3') });
+  const seg = (x, y, w, d) => items.push({ key: x + w / 2 + y + d / 2, draw: (ctx) => box(ctx, v, x, y, w, d, 0.75, theme.t.divider) });
   for (const x of [9, 22]) for (let y = 1; y < 10; y++) if (y < 4 || y >= 7) seg(x - 0.1, y, 0.2, 1);
   for (const x of [9, 16, 23]) for (let y = 12; y < 20; y++) if (y < 14.5 || y >= 17.5) seg(x - 0.1, y, 0.2, 1);
   return items;
@@ -115,11 +117,6 @@ function drawItem(ctx, v, it) {
     box(ctx, v, it.x - 0.06, it.y - 0.06, 0.12, 0.12, 1.5, '#d9c3a8');
     const [x, y] = v.p(it.x, it.y, 1.55);
     ellipse(ctx, x, y, 22 * s, 18 * s, 'rgba(255,224,150,.28)'); circle(ctx, x, y, 11 * s, '#ffe08a'); circle(ctx, x - 3 * s, y - 3 * s, 4 * s, '#fff6cf');
-  } else if (it.k === 'pingpong') {
-    box(ctx, v, it.x, it.y, it.w, it.d, 0.55, '#7ad6c8');
-    const [a, b] = [v.p(it.x + it.w / 2, it.y, 0.58), v.p(it.x + it.w / 2, it.y + it.d, 0.58)];
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5 * s; ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke();
-    box(ctx, v, it.x + it.w / 2 - 0.02, it.y, 0.04, it.d, 0.22, '#fff', 0.55);
   }
 }
 
@@ -139,22 +136,76 @@ function hairBack(ctx, st, u, c) {
   }
 }
 
-/** One character. fx = {x,y} foot point in screen px; flags describe what it's doing. */
+export const ACCESSORIES = ['bow', 'flower', 'crown', 'glasses', 'catears', 'none'];
+export const HAIR_STYLES = ['bob', 'long', 'bun', 'pigtails', 'pony', 'curly'];
+
+function accessory(ctx, kind, u, a) {
+  const gold = '#ffd95a';
+  switch (kind) {
+    case 'none': return;
+    case 'flower': {
+      const x = 9 * u, y = -55 * u;
+      for (let i = 0; i < 5; i++) { const t = i / 5 * Math.PI * 2; circle(ctx, x + Math.cos(t) * 3.4 * u, y + Math.sin(t) * 3.4 * u, 2.6 * u, '#fff'); }
+      circle(ctx, x, y, 2.2 * u, gold); return;
+    }
+    case 'crown': {
+      const y = -60 * u;
+      poly(ctx, [[-7 * u, y], [-7 * u, y - 7 * u], [-3.5 * u, y - 3 * u], [0, y - 8 * u], [3.5 * u, y - 3 * u], [7 * u, y - 7 * u], [7 * u, y]], gold, '#e9b52c');
+      circle(ctx, 0, y - 2.5 * u, 1.3 * u, '#ff6fa8'); return;
+    }
+    case 'glasses':
+      ctx.strokeStyle = '#4a2c4a'; ctx.lineWidth = 1.3 * u;
+      for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(s * 4.6 * u, -45 * u, 3.6 * u, 0, 7); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(-1 * u, -45 * u); ctx.lineTo(1 * u, -45 * u); ctx.stroke(); return;
+    case 'catears': {
+      for (const s of [-1, 1]) {
+        poly(ctx, [[s * 11 * u, -52 * u], [s * 6 * u, -66 * u], [s * 1.5 * u, -56 * u]], a.hairColor);
+        poly(ctx, [[s * 9.4 * u, -55 * u], [s * 6.3 * u, -63 * u], [s * 3.5 * u, -57 * u]], '#ffb3c8');
+      }
+      return;
+    }
+    case 'santa':
+      poly(ctx, [[-12 * u, -56 * u], [12 * u, -56 * u], [4 * u, -74 * u], [-2 * u, -72 * u]], '#e63950');
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.roundRect(-13 * u, -59 * u, 26 * u, 5 * u, 2.5 * u); ctx.fill(); circle(ctx, 4 * u, -75 * u, 3 * u, '#fff'); return;
+    case 'witch':
+      poly(ctx, [[-14 * u, -56 * u], [14 * u, -56 * u], [3 * u, -58 * u], [2 * u, -80 * u], [-3 * u, -58 * u]], '#6b3fb0');
+      ctx.fillStyle = '#4a2a85'; ctx.fillRect(-9 * u, -62 * u, 18 * u, 2.4 * u); circle(ctx, 3 * u, -61 * u, 1.6 * u, gold); return;
+    default: { // bow
+      const bx = 9 * u, by = -57 * u;
+      poly(ctx, [[bx, by], [bx + 7 * u, by - 4 * u], [bx + 7 * u, by + 4 * u]], a.accent); poly(ctx, [[bx, by], [bx - 7 * u, by - 4 * u], [bx - 7 * u, by + 4 * u]], a.accent); circle(ctx, bx, by, 2.2 * u, lighten(a.accent, 0.4));
+    }
+  }
+}
+
+/**
+ * One character. a = look (color, accent, hair, hairColor, acc) + status; n = motion (x, y, phase, seed,
+ * walking, seated, pose, lift). Poses are just for fun: dance, play, cheer, eat, sip, nap.
+ */
 export function drawAgent(ctx, v, a, n, now, sel) {
   const [fx, fy] = v.p(n.x, n.y);
   const u = Math.max(0.35, v.s) * 1.05;
-  const walking = n.walking, seated = n.seated;
-  const dark = a.status === 'dark', asleep = a.status === 'bench' && !walking;
-  const bob = walking ? Math.abs(Math.sin(n.phase * 9)) * 2.2 * u : seated ? 0 : Math.sin(now / 700 + n.seed) * 0.8 * u;
+  const walking = n.walking, seated = n.seated, pose = n.pose || null;
+  const dark = a.status === 'dark', asleep = (a.status === 'bench' && !walking && !pose) || pose === 'nap';
+  const beat = Math.sin(now / 130);
+  let bob = walking ? Math.abs(Math.sin(n.phase * 9)) * 2.2 * u : seated ? 0 : Math.sin(now / 700 + n.seed) * 0.8 * u;
+  if (pose === 'dance') bob = Math.abs(beat) * 4.5 * u;
+  if (pose === 'cheer') bob = Math.abs(Math.sin(now / 150)) * 3.5 * u;
+  const lift = (n.lift || 0) * u;
   ctx.save();
-  ctx.translate(fx, fy + (seated ? 7 * u : 0));
+  ctx.translate(fx, fy + (seated ? 7 * u : 0) + (pose === 'nap' ? 8 * u : 0));
   if (dark) ctx.globalAlpha = 0.6;
-  ellipse(ctx, 0, 1 * u, 14 * u, 5.5 * u, 'rgba(90,50,80,.18)');
+  if (n.fade !== undefined) ctx.globalAlpha *= n.fade;
+  ellipse(ctx, 0, 1 * u, 14 * u * (1 - Math.min(0.5, lift / (80 * u))), 5.5 * u, 'rgba(90,50,80,.18)');
   if (sel) { ctx.strokeStyle = '#ff5fa2'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(0, 1 * u, 19 * u, 8 * u, 0, 0, 7); ctx.stroke(); }
-  ctx.translate(0, -bob);
+  ctx.translate(0, -bob - lift);
+  if (pose === 'dance') ctx.rotate(beat * 0.07);
+  if (a.acc === 'wings') {
+    const flap = 1 + Math.sin(now / 90) * 0.12;
+    for (const s of [-1, 1]) { ctx.save(); ctx.translate(s * 7 * u, -26 * u); ctx.scale(flap, 1); ellipse(ctx, s * 9 * u, -4 * u, 11 * u, 17 * u, 'rgba(210,235,255,.75)', s * 0.5); ctx.restore(); }
+  }
   hairBack(ctx, a.hair, u, a.hairColor);
   // legs + shoes
-  const step = walking ? Math.sin(n.phase * 9) * 4 * u : 0;
+  const step = walking ? Math.sin(n.phase * 9) * 4 * u : pose === 'dance' ? beat * 3 * u : 0;
   for (const [sx, off] of [[-5, step], [5, -step]]) {
     ctx.beginPath(); ctx.roundRect((sx - 2.2) * u, -13 * u + Math.min(0, off) * 0.3, 4.4 * u, 12 * u, 2 * u); ctx.fillStyle = SKIN; ctx.fill();
     ellipse(ctx, sx * u + off * 0.4, -1 * u, 4.6 * u, 2.6 * u, a.accent);
@@ -163,13 +214,18 @@ export function drawAgent(ctx, v, a, n, now, sel) {
   ctx.beginPath(); ctx.moveTo(-8 * u, -34 * u); ctx.lineTo(8 * u, -34 * u); ctx.lineTo(13 * u, -11 * u); ctx.quadraticCurveTo(0, -7 * u, -13 * u, -11 * u); ctx.closePath();
   ctx.fillStyle = a.color; ctx.fill(); ctx.strokeStyle = darken(a.color, 0.12); ctx.lineWidth = 1; ctx.stroke();
   ctx.fillStyle = lighten(a.color, 0.55); ctx.fillRect(-8 * u, -34 * u, 16 * u, 3.2 * u);
-  circle(ctx, 0, -25 * u, 1.8 * u, a.accent);                                         // button
-  // arms (typing wiggle when working at a desk)
-  const type = seated && a.status === 'working' ? Math.sin(now / 90) * 2.2 * u : 0;
-  const armY = seated && a.status === 'working' ? -24 * u : -30 * u;
-  for (const s of [-1, 1]) {
-    ctx.beginPath(); ctx.roundRect((s < 0 ? -12.5 : 8.2) * u, armY + (s < 0 ? type : -type), 4.4 * u, 11 * u, 2.2 * u); ctx.fillStyle = a.color; ctx.fill();
-    circle(ctx, (s < 0 ? -10.3 : 10.4) * u, armY + 11.5 * u + (s < 0 ? type : -type), 2.6 * u, SKIN);
+  circle(ctx, 0, -25 * u, 1.8 * u, a.accent);
+  // arms: [left y, right y] offsets from the shoulder line
+  const typing = seated && a.status === 'working' ? Math.sin(now / 90) * 2.2 * u : 0;
+  let armY = seated && a.status === 'working' ? -24 * u : -30 * u, l = typing, r = -typing;
+  if (pose === 'dance') { armY = -38 * u; l = beat * 5 * u; r = -beat * 5 * u; }
+  else if (pose === 'cheer') { armY = -40 * u; l = r = Math.sin(now / 150) * 2 * u; }
+  else if (pose === 'play') { armY = -27 * u; l = Math.sin(now / 110) * 4 * u; r = -l; }
+  else if (pose === 'eat' || pose === 'sip') { r = -9 * u + Math.sin(now / 250) * 2 * u; armY = -31 * u; }
+  for (const side of [-1, 1]) {
+    const off = side < 0 ? l : r;
+    ctx.beginPath(); ctx.roundRect((side < 0 ? -12.5 : 8.2) * u, armY + off, 4.4 * u, 11 * u, 2.2 * u); ctx.fillStyle = a.color; ctx.fill();
+    circle(ctx, (side < 0 ? -10.3 : 10.4) * u, armY + 11.5 * u + off, 2.6 * u, SKIN);
   }
   // head
   circle(ctx, 0, -46 * u, 12.5 * u, SKIN);
@@ -179,21 +235,26 @@ export function drawAgent(ctx, v, a, n, now, sel) {
   if (asleep) { ctx.strokeStyle = '#4a2c4a'; ctx.lineWidth = 1.6 * u; for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(s * 4.6 * u, -45 * u, 2 * u, 0.2, Math.PI - 0.2); ctx.stroke(); } }
   else {
     const blink = Math.sin(now / 1100 + n.seed * 3) > 0.985;
+    const happy = pose === 'cheer' || pose === 'dance' || pose === 'eat';
     for (const s of [-1, 1]) {
-      if (blink) { ctx.strokeStyle = '#4a2c4a'; ctx.lineWidth = 1.4 * u; ctx.beginPath(); ctx.moveTo(s * 4.6 * u - 2 * u, -45 * u); ctx.lineTo(s * 4.6 * u + 2 * u, -45 * u); ctx.stroke(); }
+      if (blink || happy) { ctx.strokeStyle = '#4a2c4a'; ctx.lineWidth = 1.5 * u; ctx.beginPath(); if (happy) ctx.arc(s * 4.6 * u, -44 * u, 2.2 * u, Math.PI * 1.1, Math.PI * 1.9); else { ctx.moveTo(s * 4.6 * u - 2 * u, -45 * u); ctx.lineTo(s * 4.6 * u + 2 * u, -45 * u); } ctx.stroke(); }
       else { ellipse(ctx, s * 4.6 * u, -45 * u, 1.9 * u, 2.6 * u, '#4a2c4a'); circle(ctx, s * 4.6 * u + 0.7 * u, -46 * u, 0.8 * u, '#fff'); }
     }
   }
-  ellipse(ctx, -8.4 * u, -41 * u, 3 * u, 1.8 * u, 'rgba(255,120,160,.5)'); ellipse(ctx, 8.4 * u, -41 * u, 3 * u, 1.8 * u, 'rgba(255,120,160,.5)');
+  ellipse(ctx, -8.4 * u, -41 * u, 3 * u, 1.8 * u, pose ? 'rgba(255,100,150,.7)' : 'rgba(255,120,160,.5)'); ellipse(ctx, 8.4 * u, -41 * u, 3 * u, 1.8 * u, pose ? 'rgba(255,100,150,.7)' : 'rgba(255,120,160,.5)');
   ctx.strokeStyle = '#c0607e'; ctx.lineWidth = 1.2 * u; ctx.beginPath();
-  if (a.status === 'asking' || a.status === 'blocked') ctx.arc(0, -39 * u, 1.5 * u, 0, 7); else ctx.arc(0, -41 * u, 2.4 * u, 0.15 * Math.PI, 0.85 * Math.PI);
+  if (pose === 'cheer' || pose === 'dance') ctx.arc(0, -42 * u, 3.4 * u, 0.1 * Math.PI, 0.9 * Math.PI);
+  else if (a.status === 'asking' || a.status === 'blocked') ctx.arc(0, -39 * u, 1.5 * u, 0, 7);
+  else ctx.arc(0, -41 * u, 2.4 * u, 0.15 * Math.PI, 0.85 * Math.PI);
   ctx.stroke();
-  // bow
-  const bx = 9 * u, by = -57 * u;
-  poly(ctx, [[bx, by], [bx + 7 * u, by - 4 * u], [bx + 7 * u, by + 4 * u]], a.accent); poly(ctx, [[bx, by], [bx - 7 * u, by - 4 * u], [bx - 7 * u, by + 4 * u]], a.accent); circle(ctx, bx, by, 2.2 * u, lighten(a.accent, 0.4));
+  accessory(ctx, a.acc === 'wings' ? 'none' : a.acc || 'bow', u, a);
+  if (pose === 'eat' || pose === 'sip') {   // the treat in her hand
+    ctx.font = `${Math.round(11 * u)}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(pose === 'eat' ? '🍰' : '🧋', 12 * u, armY + 2 * u + r);
+  }
   if (a.status === 'blocked') { ellipse(ctx, 15 * u, -52 * u, 2 * u, 3 * u, '#9ad6f2'); }
   ctx.restore();
-  return { x: fx, y: fy - 62 * u * 0.9, u };
+  return { x: fx, y: fy - 62 * u * 0.9 - lift - bob, u };
 }
 
 export function drawBadge(ctx, x, y, u, icon, glow) {

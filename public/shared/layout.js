@@ -29,12 +29,12 @@ for (const [x, y] of [[23.8, 2.6], [27.2, 2.6], [23.8, 6.6], [27.2, 6.6]]) {
 // Off-duty hangouts. Purely cosmetic: they never change server state.
 export const SPOTS = {
   kitchen: [{ x: 3, y: 14.6, say: 'is pouring tea' }, { x: 6.2, y: 16.8, say: 'is nibbling a croissant' }, { x: 2.8, y: 18, say: 'is raiding the fridge' }],
-  rec: [{ x: 11, y: 15.6, say: 'is practicing ping-pong serves' }, { x: 14.2, y: 15.6, say: 'is winning at ping-pong' }, { x: 12.5, y: 18.4, say: 'is napping on a bean bag' }],
+  rec: [{ x: 10.6, y: 13.6, say: 'is stretching in the rec room' }, { x: 12.5, y: 18.4, say: 'is napping on a bean bag' }],
   lounge: [{ x: 18.2, y: 17.2, say: 'is curled up on the sofa' }, { x: 20.6, y: 17.2, say: 'is scrolling on the sofa' }, { x: 21, y: 14.2, say: 'is reading by the lamp' }],
   garden: [{ x: 25.2, y: 14.8, say: 'is watering the flowers' }, { x: 27.4, y: 17.6, say: 'is petting the office cat' }, { x: 28.2, y: 14.6, say: 'is feeding the koi' }],
 };
 
-// Rendering primitives. k: box | flat | tree | bush | flowers | pond | lamp | pingpong
+// Rendering primitives. k: box | flat | tree | bush | flowers | pond | lamp
 const F = [];
 const box = (x, y, w, d, h, c, z = 0) => F.push({ k: 'box', x, y, w, d, h, c, z });
 const flat = (x, y, w, d, c, round) => F.push({ k: 'flat', x, y, w, d, c, round });
@@ -69,7 +69,6 @@ box(1.2, 17.4, 1.2, 1.3, 1.5, '#ffc2d9');
 box(5.2, 15.8, 1.8, 1.8, 0.5, '#fff', 0); box(5.7, 16.3, 0.35, 0.35, 0.18, '#ff9ec4', 0.5);
 F.push({ k: 'lamp', x: 8.2, y: 13.3 });
 // rec room: ping-pong, bean bags
-F.push({ k: 'pingpong', x: 11.6, y: 15, w: 2.6, d: 1.4 });
 F.push({ k: 'bush', x: 11.6, y: 18.8, c: '#ffb3d1', s: 1.1 }); F.push({ k: 'bush', x: 14.4, y: 18.4, c: '#b9c8ff', s: 1.0 });
 // lounge: rug, sofas, lamp, plants
 flat(17.2, 14.3, 4.8, 3.6, '#ffc6dc', true);
@@ -85,3 +84,6 @@ for (const [x, y] of [[25.2, 13.4], [26.2, 19.4], [28.2, 16.4], [29, 12.8]]) F.p
 flat(0.1, 10.5, 1.3, 1, '#ffb3d1', true);
 
 export const FURNITURE = F;
+
+// What a fresh office starts with: just the ping-pong table. Everything else comes from Edit Office.
+export const DEFAULT_PLACED = [{ uid: 'p-default', id: 'pingpong', x: 11.6, y: 15, rot: 0 }];
