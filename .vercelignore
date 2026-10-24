@@ -1,0 +1,6 @@
+# The Node server, relay, hook script and tests are not part of the static site.
+server.js
+src
+relay
+hooks
+test
